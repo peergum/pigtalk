@@ -49,6 +49,7 @@ type Character struct {
 	value rune
 	seqs  CSeqs
 	next  [MAXWORDLEN]CStats
+	count int
 }
 
 type Characters []*Character
@@ -160,18 +161,19 @@ func searchCSeq(char rune) (cseq *CSeq, cchar *Character, err error) {
 	// search char
 	for _, schar := range chars {
 		if schar.value == char {
+			schar.count++
 			//logf("Found char %c\n", char)
 			found := false
 			for _, cseq := range schar.seqs {
 				if cseq.previous == pChar {
-					fmt.Printf("(%c)", char)
+					fmt.Printf("\x1b[30m%c\x1b[0m", char)
 					found = true
 					cseq.previous.addNext(schar, 0)
 					break
 				}
 			}
 			if !found {
-				fmt.Printf("%c", char)
+				fmt.Printf("\x1b[31m%c\x1b[0m", char)
 				cseq := CSeq{
 					position: cposition,
 					previous: pChar,
@@ -184,7 +186,7 @@ func searchCSeq(char rune) (cseq *CSeq, cchar *Character, err error) {
 			return cseq, schar, nil
 		}
 	}
-	fmt.Printf("[%0X-%c]", char, char)
+	fmt.Printf("\x1b[32m%c\x1b[0m", char)
 	cseq = &CSeq{
 		position: cposition,
 		previous: pChar,
@@ -195,6 +197,7 @@ func searchCSeq(char rune) (cseq *CSeq, cchar *Character, err error) {
 		seqs: CSeqs{
 			cseq,
 		},
+		count: 1,
 	}
 	if pChar != nil {
 		cseq.previous.addNext(schar, 0)
@@ -271,6 +274,19 @@ func (chars Characters) Len() int {
 	return len(chars)
 }
 
+// Characters sorting by count
+type CharactersByCount Characters
+
+func (chars CharactersByCount) Less(i, j int) bool {
+	return chars[i].count < chars[j].count
+}
+func (chars CharactersByCount) Swap(i, j int) {
+	chars[i], chars[j] = chars[j], chars[i]
+}
+func (chars CharactersByCount) Len() int {
+	return len(chars)
+}
+
 // Stats sorting
 func (stats CStats) Less(i, j int) bool {
 	return stats[i].char.value < stats[j].char.value
@@ -298,7 +314,7 @@ func (chars BySeqFrequency) Swap(i, j int) {
 func showStats() {
 	sort.Sort(chars)
 	for _, char := range chars {
-		fmt.Printf("[%0X-%c]", char.value, char.value)
+		fmt.Printf("%c[%0x]-(%d)", char.value, char.value,char.count)
 		sort.Sort(char.seqs)
 		fmt.Printf(" -> %s", char.seqs)
 		sort.Sort(sort.Reverse(char.next[0]))
@@ -310,4 +326,9 @@ func showStats() {
 		fmt.Printf("[%0X:%c-%d]\n", char.value, char.value, len(char.next[0])+len(char.seqs))
 	}
 	fmt.Printf("SPACE is '%c'\n", chars[0].value)
+	fmt.Println("Sorting by Appearance Frequency")
+	sort.Sort(sort.Reverse(CharactersByCount(chars)))
+	for _, char := range chars {
+		fmt.Printf("%c[%0x]: %d\n", char.value, char.value, char.count)
+	}
 }
