@@ -76,6 +76,8 @@ type Current struct {
 }
 
 var (
+	Chars Characters
+
 	chars   Characters
 	words   Words
 	phrases Phrases
@@ -93,8 +95,9 @@ var (
 	cPhrase *Phrase
 	ipPSeq  int = -1
 
-	cQueue    Characters = make(Characters, 0, MAXWORDLEN)
-	totalChar int        = 0
+	//cQueue    Characters = make(Characters, 0, MAXWORDLEN)
+	//totalChar int        = 0
+	space *Character
 
 	debug *bool = flag.Bool("d", false, "Debugging")
 )
@@ -110,12 +113,16 @@ func main() {
 	}
 	filename := args[0]
 	scan(filename)
+	fmt.Println()
+	showStats()
+	pass2()
 }
 
 func scan(filename string) {
 	file, err := os.Open(filename)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	defer file.Close()
 
@@ -131,10 +138,9 @@ func scan(filename string) {
 		}
 		if size > 0 {
 			_, pChar, err = searchCSeq(char)
+			Chars = append(Chars, pChar)
 		}
 	}
-	fmt.Println()
-	showStats()
 }
 
 func (char *Character) addNext(nextChar *Character, position int) {
@@ -314,7 +320,7 @@ func (chars BySeqFrequency) Swap(i, j int) {
 func showStats() {
 	sort.Sort(chars)
 	for _, char := range chars {
-		fmt.Printf("%c[%0x]-(%d)", char.value, char.value,char.count)
+		fmt.Printf("%c[%0x]-(%d)", char.value, char.value, char.count)
 		sort.Sort(char.seqs)
 		fmt.Printf(" -> %s", char.seqs)
 		sort.Sort(sort.Reverse(char.next[0]))
@@ -325,10 +331,38 @@ func showStats() {
 	for _, char := range chars {
 		fmt.Printf("[%0X:%c-%d]\n", char.value, char.value, len(char.next[0])+len(char.seqs))
 	}
-	fmt.Printf("SPACE is '%c'\n", chars[0].value)
+	space = chars[0]
+	fmt.Printf("SPACE is '%c'\n", space.value)
 	fmt.Println("Sorting by Appearance Frequency")
 	sort.Sort(sort.Reverse(CharactersByCount(chars)))
 	for _, char := range chars {
 		fmt.Printf("%c[%0x]: %d\n", char.value, char.value, char.count)
 	}
+}
+
+func pass2() {
+	logf("Pass2: words\n")
+	//var buffer Characters
+	//var pWord Word
+	position := 0
+	for i, char := range Chars {
+		fmt.Printf("%c", char.value)
+		if char.value == space.value && position < i {
+			word := &Word{
+				chars: Chars[position:i],
+			}
+			position = i + 1
+			words = append(words, word)
+			logf("Word: [%s]\n", word)
+		}
+	}
+	if position < len(Chars) {
+		word := &Word{
+			chars: Chars[position:],
+		}
+		words = append(words, word)
+		logf("Word: [%s]\n", word)
+
+	}
+	fmt.Println()
 }
