@@ -46,7 +46,7 @@ type CStat struct {
 type CStats []*CStat
 
 type Character struct {
-	value byte
+	value rune
 	seqs  CSeqs
 	next  [MAXWORDLEN]CStats
 }
@@ -121,16 +121,16 @@ func scan(filename string) {
 	reader := bufio.NewReader(file)
 	eof := false
 	for !eof {
-		char, err := reader.ReadByte()
+		char, size, err := reader.ReadRune()
 		if err != nil {
 			if err != io.EOF {
 				panic(err)
 			}
 			eof = true
 		}
-		//if size > 0 {
-		_, pChar, err = searchCSeq(char)
-		//}
+		if size > 0 {
+			_, pChar, err = searchCSeq(char)
+		}
 	}
 	fmt.Println()
 	showStats()
@@ -156,7 +156,7 @@ func (char *Character) addNext(nextChar *Character, position int) {
 	}
 }
 
-func searchCSeq(char byte) (cseq *CSeq, cchar *Character, err error) {
+func searchCSeq(char rune) (cseq *CSeq, cchar *Character, err error) {
 	// search char
 	for _, schar := range chars {
 		if schar.value == char {
@@ -184,7 +184,7 @@ func searchCSeq(char byte) (cseq *CSeq, cchar *Character, err error) {
 			return cseq, schar, nil
 		}
 	}
-	fmt.Printf("[%02x-%c]", char, char)
+	fmt.Printf("[%0X-%c]", char, char)
 	cseq = &CSeq{
 		position: cposition,
 		previous: pChar,
@@ -213,7 +213,7 @@ func (char *Character) String() string {
 }
 
 func (cseq *CSeq) String() string {
-	previous := byte('ø')
+	previous := 'ø'
 	if cseq.previous != nil {
 		previous = cseq.previous.value
 	}
@@ -240,7 +240,7 @@ func (cstat *CStat) String() string {
 	if cstat == nil {
 		return "."
 	}
-	return fmt.Sprintf("%02x-%c:%d", cstat.char.value, cstat.char.value, cstat.count)
+	return fmt.Sprintf("%0X-%c:%d", cstat.char.value, cstat.char.value, cstat.count)
 }
 
 // CSeqs sorting
@@ -298,7 +298,7 @@ func (chars BySeqFrequency) Swap(i, j int) {
 func showStats() {
 	sort.Sort(chars)
 	for _, char := range chars {
-		fmt.Printf("[%02x-%c]", char.value, char.value)
+		fmt.Printf("[%0X-%c]", char.value, char.value)
 		sort.Sort(char.seqs)
 		fmt.Printf(" -> %s", char.seqs)
 		sort.Sort(sort.Reverse(char.next[0]))
@@ -307,7 +307,7 @@ func showStats() {
 	fmt.Println("Sorting by Sequence Frequency")
 	sort.Sort(sort.Reverse(BySeqFrequency(chars)))
 	for _, char := range chars {
-		fmt.Printf("[%02X:%c-%d]\n", char.value, char.value, len(char.next[0])+len(char.seqs))
+		fmt.Printf("[%0X:%c-%d]\n", char.value, char.value, len(char.next[0])+len(char.seqs))
 	}
 	fmt.Printf("SPACE is '%c'\n", chars[0].value)
 }
