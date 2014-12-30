@@ -57,6 +57,7 @@ type Characters []*Character
 type Word struct {
 	chars Characters
 	seqs  []*WSeq
+	count int
 }
 
 type Words []*Word
@@ -114,8 +115,9 @@ func main() {
 	filename := args[0]
 	scan(filename)
 	fmt.Println()
-	showStats()
+	charStats()
 	pass2()
+	wordStats()
 }
 
 func scan(filename string) {
@@ -179,7 +181,7 @@ func searchCSeq(char rune) (cseq *CSeq, cchar *Character, err error) {
 				}
 			}
 			if !found {
-				fmt.Printf("\x1b[31m%c\x1b[0m", char)
+				fmt.Printf("\x1b[41m%c\x1b[0m", char)
 				cseq := CSeq{
 					position: cposition,
 					previous: pChar,
@@ -192,7 +194,7 @@ func searchCSeq(char rune) (cseq *CSeq, cchar *Character, err error) {
 			return cseq, schar, nil
 		}
 	}
-	fmt.Printf("\x1b[32m%c\x1b[0m", char)
+	fmt.Printf("\x1b[42m%c\x1b[0m", char)
 	cseq = &CSeq{
 		position: cposition,
 		previous: pChar,
@@ -281,15 +283,15 @@ func (chars Characters) Len() int {
 }
 
 // Characters sorting by count
-type CharactersByCount Characters
+type CharactersByFrequency Characters
 
-func (chars CharactersByCount) Less(i, j int) bool {
+func (chars CharactersByFrequency) Less(i, j int) bool {
 	return chars[i].count < chars[j].count
 }
-func (chars CharactersByCount) Swap(i, j int) {
+func (chars CharactersByFrequency) Swap(i, j int) {
 	chars[i], chars[j] = chars[j], chars[i]
 }
-func (chars CharactersByCount) Len() int {
+func (chars CharactersByFrequency) Len() int {
 	return len(chars)
 }
 
@@ -317,7 +319,57 @@ func (chars BySeqFrequency) Swap(i, j int) {
 	chars[i], chars[j] = chars[j], chars[i]
 }
 
-func showStats() {
+// Words sorting
+func (words Words) Len() int {
+	return len(words)
+}
+func (words Words) Less(i, j int) bool {
+	for index, char := range words[i].chars {
+		if index >= len(words[j].chars) {
+			return false
+		}
+		if char.value < words[j].chars[index].value {
+			return true
+		}
+		if char.value > words[j].chars[index].value {
+			return false
+		}
+	}
+	if len(words[i].chars) < len(words[j].chars) {
+		return true
+	}
+	return false
+}
+func (words Words) Swap(i, j int) {
+	words[i], words[j] = words[j], words[i]
+}
+func (words Words) Search(needle *Word) int {
+	for index, word := range words {
+		compare := Words{
+			word,
+			needle,
+		}
+		if !compare.Less(0, 1) {
+			return index
+		}
+	}
+	return len(words)
+}
+
+// Words sorting by frequency
+type WordsByFrequency Words
+
+func (words WordsByFrequency) Len() int {
+	return len(words)
+}
+func (words WordsByFrequency) Less(i, j int) bool {
+	return words[i].count < words[j].count
+}
+func (words WordsByFrequency) Swap(i, j int) {
+	words[i], words[j] = words[j], words[i]
+}
+
+func charStats() {
 	sort.Sort(chars)
 	for _, char := range chars {
 		fmt.Printf("%c[%0x]-(%d)", char.value, char.value, char.count)
@@ -331,12 +383,37 @@ func showStats() {
 	for _, char := range chars {
 		fmt.Printf("[%0X:%c-%d]\n", char.value, char.value, len(char.next[0])+len(char.seqs))
 	}
-	space = chars[0]
-	fmt.Printf("SPACE is '%c'\n", space.value)
 	fmt.Println("Sorting by Appearance Frequency")
-	sort.Sort(sort.Reverse(CharactersByCount(chars)))
+	sort.Sort(sort.Reverse(CharactersByFrequency(chars)))
 	for _, char := range chars {
 		fmt.Printf("%c[%0x]: %d\n", char.value, char.value, char.count)
+	}
+	space = chars[0]
+	fmt.Printf("SPACE is '%c'\n", space.value)
+}
+
+func wordStats() {
+	sort.Sort(words)
+	for _, word := range words {
+		fmt.Printf("%s (%d)\n", word, word.count)
+		// sort.Sort(char.seqs)
+		// fmt.Printf(" -> %s", char.seqs)
+		// sort.Sort(sort.Reverse(char.next[0]))
+		// fmt.Printf(" -> %s\n", char.next[0])
+	}
+	/*
+		fmt.Println("Sorting by Sequence Frequency")
+		sort.Sort(sort.Reverse(BySeqFrequency(chars)))
+		for _, char := range chars {
+			fmt.Printf("[%0X:%c-%d]\n", char.value, char.value, len(char.next[0])+len(char.seqs))
+		}
+		space = chars[0]
+		fmt.Printf("SPACE is '%c'\n", space.value)
+	*/
+	fmt.Println("Sorting by Appearance Frequency")
+	sort.Sort(WordsByFrequency(words))
+	for _, word := range words {
+		fmt.Printf("%03d: %s\n", word.count, word)
 	}
 }
 
@@ -346,23 +423,48 @@ func pass2() {
 	//var pWord Word
 	position := 0
 	for i, char := range Chars {
-		fmt.Printf("%c", char.value)
-		if char.value == space.value && position < i {
+		//fmt.Printf("%c", char.value)
+		if char.value == space.value || char.value == '\r' || char.value == '\n' {
+			if position == i {
+				position++
+				continue
+			}
 			word := &Word{
 				chars: Chars[position:i],
+				count: 1,
 			}
 			position = i + 1
-			words = append(words, word)
-			logf("Word: [%s]\n", word)
+			found := words.Search(word)
+			if found == len(words) || word.String() != words[found].String() {
+				words = append(words, word)
+				logf("Added word: [%s]\n", word)
+				sort.Sort(words)
+				fmt.Printf("\x1b[41m%s\x1b[0m ", word)
+			} else {
+				words[found].count++
+				logf("Found word: [%s]\n", word)
+				fmt.Printf("%s ", word)
+			}
+		} else {
+
 		}
 	}
 	if position < len(Chars) {
 		word := &Word{
 			chars: Chars[position:],
+			count: 1,
 		}
-		words = append(words, word)
-		logf("Word: [%s]\n", word)
-
+		found := words.Search(word)
+		if found == len(words) || word.String() != words[found].String() {
+			words = append(words, word)
+			logf("Added word: [%s]\n", word)
+			sort.Sort(words)
+			fmt.Printf("\x1b[41m%s\x1b[0m ", word)
+		} else {
+			words[found].count++
+			logf("Found word: [%s]\n", word)
+			fmt.Printf("%s ", word)
+		}
 	}
 	fmt.Println()
 }
