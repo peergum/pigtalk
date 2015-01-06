@@ -124,18 +124,26 @@ func main() {
 	input := bufio.NewReader(os.Stdin)
 	for {
 		var (
-			r    rune
-			size int
+			s   string
+			err error
+			//size int
 		)
 		for {
-			r, size, _ = input.ReadRune()
-			if size > 0 {
+			s, err = input.ReadString('\n')
+			if err == nil {
 				break
 			}
 		}
-		fmt.Printf("[%c]", r)
-		x := searchChar(r)
-		fmt.Println(x.seqs)
+		s = s[:len(s)-1]
+		fmt.Printf("[%s]", s)
+		for i, r := range s {
+			x := searchChar(rune(r))
+			if len(x.seqs[i]) > 0 {
+				fmt.Println(x, x.seqs[i][0].next)
+			} else {
+				fmt.Println(x)
+			}
+		}
 	}
 }
 
@@ -196,7 +204,6 @@ func updateCSeq(word *Word) {
 
 func searchCSeq(position int, char, previous, next *Character, word *Word) {
 	found := false
-	fmt.Println("size:", len(char.seqs), "position:", position)
 	for _, cseq := range char.seqs[position] {
 		if cseq.previous == previous && cseq.next == next {
 			found = true
@@ -206,6 +213,7 @@ func searchCSeq(position int, char, previous, next *Character, word *Word) {
 				cseq.words = append(cseq.words, word)
 				sort.Sort(cseq.words)
 			}
+			sort.Sort(sort.Reverse(char.seqs[position]))
 			break
 		}
 	}
@@ -214,6 +222,7 @@ func searchCSeq(position int, char, previous, next *Character, word *Word) {
 			previous: previous,
 			next:     next,
 			words:    Words{word},
+			count:    1,
 		}
 		char.seqs[position] = append(char.seqs[position], cseq)
 	}
@@ -332,7 +341,7 @@ func (cseq *CSeq) String() string {
 	if cseq.next != nil {
 		next = cseq.next.value
 	}
-	return fmt.Sprintf("%c|%c", previous, next)
+	return fmt.Sprintf("%c|%c(%d)", previous, next, cseq.count)
 }
 
 func (word *Word) String() (result string) {
@@ -360,13 +369,7 @@ func logf(fmt string, v ...interface{}) {
 
 // CSeqs sorting
 func (cseqs CSeqs) Less(i, j int) bool {
-	switch {
-	case cseqs[i].previous == nil && cseqs[j].previous != nil:
-		return true
-	case cseqs[i].previous == nil || cseqs[j].previous == nil:
-		return false
-	}
-	return cseqs[i].previous.value < cseqs[j].previous.value
+	return cseqs[i].count < cseqs[j].count
 }
 func (cseqs CSeqs) Swap(i, j int) {
 	cseqs[i], cseqs[j] = cseqs[j], cseqs[i]
