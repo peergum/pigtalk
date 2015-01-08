@@ -54,6 +54,13 @@ type Character struct {
 
 type Characters []*Character
 
+type Prefix struct {
+	value string
+	next  CStats
+}
+
+type Prefixes []*Prefix
+
 type Word struct {
 	chars Characters
 	seqs  []*WSeq
@@ -79,9 +86,10 @@ type Current struct {
 var (
 	Chars Characters
 
-	chars   Characters
-	words   Words
-	phrases Phrases
+	chars    Characters
+	prefixes Prefixes
+	words    Words
+	phrases  Phrases
 
 	cposition   = 0
 	pChar       *Character
@@ -136,13 +144,12 @@ func main() {
 		}
 		s = s[:len(s)-1]
 		fmt.Printf("[%s]", s)
-		for i, r := range s {
-			x := searchChar(rune(r))
-			if len(x.seqs[i]) > 0 {
-				fmt.Println(x, x.seqs[i][0].next)
-			} else {
-				fmt.Println(x)
-			}
+		prefix := searchPrefix(s)
+		for prefix != nil {
+			fmt.Printf("Next: %s\n", prefix.next)
+			s = fmt.Sprintf("%s%c", s, prefix.next[0].char.value)
+			prefix = searchPrefix(s)
+			fmt.Println(s)
 		}
 	}
 }
@@ -194,12 +201,47 @@ func updateCSeq(word *Word) {
 		var next *Character
 		if i > 0 {
 			previous = word.chars[i-1]
+			prefix := word.chars[:i]
+			updatePrefix(prefix.String(), char)
 		}
 		if i < len(word.chars)-1 {
 			next = word.chars[i+1]
 		}
 		searchCSeq(i, char, previous, next, word)
 	}
+}
+
+func updatePrefix(text string, char *Character) {
+	prefix := searchPrefix(text)
+	if prefix == nil {
+		prefix = &Prefix{
+			value: text,
+			next:  CStats{},
+		}
+		prefixes = append(prefixes, prefix)
+	}
+	for _, next := range prefix.next {
+		if next.char == char {
+			next.count++
+			sort.Sort(sort.Reverse(prefix.next))
+			return
+		}
+	}
+	cstat := &CStat{
+		char:  char,
+		count: 1,
+	}
+	prefix.next = append(prefix.next, cstat)
+	sort.Sort(sort.Reverse(prefix.next))
+}
+
+func searchPrefix(text string) *Prefix {
+	for _, prefix := range prefixes {
+		if prefix.value == text {
+			return prefix
+		}
+	}
+	return nil
 }
 
 func searchCSeq(position int, char, previous, next *Character, word *Word) {
@@ -332,6 +374,13 @@ func (char *Character) String() string {
 	return fmt.Sprintf("%c", char.value)
 }
 
+func (chars Characters) String() (result string) {
+	for _, char := range chars {
+		result = fmt.Sprintf("%s%c", result, char.value)
+	}
+	return result
+}
+
 func (cseq *CSeq) String() string {
 	previous := 'ø'
 	if cseq.previous != nil {
@@ -404,7 +453,7 @@ func (chars CharactersByFrequency) Len() int {
 
 // Stats sorting
 func (stats CStats) Less(i, j int) bool {
-	return stats[i].char.value < stats[j].char.value
+	return stats[i].count < stats[j].count
 }
 func (stats CStats) Swap(i, j int) {
 	stats[i], stats[j] = stats[j], stats[i]
