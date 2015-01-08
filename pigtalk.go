@@ -209,6 +209,7 @@ func updateCSeq(word *Word) {
 		}
 		searchCSeq(i, char, previous, next, word)
 	}
+	updatePrefix(word.String(), &Character{})
 }
 
 func updatePrefix(text string, char *Character) {
