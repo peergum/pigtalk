@@ -201,15 +201,12 @@ func updateCSeq(word *Word) {
 		var next *Character
 		if i > 0 {
 			previous = word.chars[i-1]
-			prefix := word.chars[:i]
-			updatePrefix(prefix.String(), char)
 		}
 		if i < len(word.chars)-1 {
 			next = word.chars[i+1]
 		}
 		searchCSeq(i, char, previous, next, word)
 	}
-	updatePrefix(word.String(), &Character{})
 }
 
 func updatePrefix(text string, char *Character) {
@@ -222,7 +219,7 @@ func updatePrefix(text string, char *Character) {
 		prefixes = append(prefixes, prefix)
 	}
 	for _, next := range prefix.next {
-		if next.char == char {
+		if next.char.value == char.value {
 			next.count++
 			sort.Sort(sort.Reverse(prefix.next))
 			return
@@ -335,6 +332,11 @@ func pass2() {
 				chars: Chars[position:i],
 				count: 1,
 			}
+			prefix := Chars[position:i]
+			updatePrefix(prefix.String(), &Character{
+				value: 0,
+				count: 0,
+			})
 			position = i + 1
 			found := words.Search(word)
 			if found == len(words) || word.String() != words[found].String() {
@@ -346,6 +348,9 @@ func pass2() {
 				words[found].count++
 				logf("Found word: [%s]\n", word)
 			}
+		} else {
+			prefix := Chars[position:i]
+			updatePrefix(prefix.String(), char)
 		}
 		fmt.Printf("\r%3d%% ", 100*i/total)
 	}
